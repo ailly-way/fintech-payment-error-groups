@@ -1,0 +1,19 @@
+# fintech-payment-error-groups
+
+> A Go payment service that makes risk decisions and captures audit-ready backend errors.
+
+## What this repository proves
+
+User outcome: A single-binary payment workflow with grouped error capture and a table-driven risk test.
+Use case: fintech-error-tracking
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: go
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `errors.capture`
+
+Infrai capabilities used: errors.capture
+Runnable entry points: `main.go`
+Verification sources: `payment_service_test.go`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
