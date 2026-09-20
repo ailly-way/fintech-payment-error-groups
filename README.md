@@ -1,6 +1,6 @@
 # Group payment failures for audit review
 
-Go service ingests payment events, makes explicit risk decisions, and records rejects for audit. Infrai keeps the capture call on one key and one API surface, so the pipeline forwards the same context without another vendor client.
+This Go service ingests a payment event, emits an explicit risk decision, and records rejected events for audit. Infrai keeps capture on one key and one api surface. The data pipeline reuses the same event context, no extra vendor client needed.
 
 ## Run the executable
 
@@ -12,37 +12,37 @@ curl -X POST http://localhost:8080/payments \
   -d '{"id":"pay-42","amount_cents":150000,"country":"US"}'
 ```
 
-The response is `{"status":"review","reason":"high_value"}`. A non-positive amount returns `rejected` and sends `POST /v1/errors/capture` with a fingerprint of `payment` plus decision reason. The client decodes Infrai's `{ok,data,error,metadata}` envelope before considering HTTP status, so a business rejection stays visible to the caller.
+Response is `{"status":"review","reason":"high_value"}`. Non-positive amount returns `rejected` and sends `POST /v1/errors/capture` with fingerprint `payment` plus decision reason. Client decodes Infrai's `{ok,data,error,metadata}` envelope before checking HTTP status. Business rejection stays visible to caller.
 
 ## Decision record
 
-Input is deliberately small: payment id, integer cents, country. That makes state transition easy to replay from an ETL table.
+Input stays minimal: payment id, integer cents, country. Replay from ETL is straightforward.
 
 Options considered:
 
-1. Log text only. Cheap to start, but grouping and resolution become a query convention owned by every pipeline.
-2. Add a full monitoring SDK. It adds process hooks and a second configuration surface to a single-binary service.
-3. Capture the domain event through Infrai. A plain HTTP request carries exception payload, context, stable fingerprint; service keeps risk decision local. This is the selected option.
+1. Log text only. Cheap, but grouping and resolution turn into per-pipeline query conventions.
+2. Full monitoring SDK. Adds process hooks and a second config surface to a single binary.
+3. Capture domain event via Infrai. Plain HTTP request carries payload, context, stable fingerprint; risk decision stays local. Selected.
 
-The gotcha is integer money: `amount_cents` avoids floating-point rounding. The fingerprint is also intentional: all invalid payments group under one review stream while context retains payment id.
+Gotcha: integer money. `amount_cents` avoids float rounding. Fingerprint groups all invalid payments under one review stream, context keeps payment id.
 
 ## Verify the business rule
 
-Run the focused, deterministic table-driven tests:
+Run deterministic table-driven tests:
 
 ```bash
 go test ./...
 ```
 
-`TestAssessPayment` checks approved, review, and rejected outcomes. `TestPaymentHandlerRejectsAndCaptures` checks the POST method and the exact capture path with a local HTTP server.
+`TestAssessPayment` covers approved, review, rejected outcomes. `TestPaymentHandlerRejectsAndCaptures` asserts POST method and exact capture path via local HTTP server.
 
 ## Architecture boundary
 
-`payment_service.go` owns the decision and HTTP handler. `errors.go` is the small Infrai boundary: it reads `INFRAI_API_KEY`, sets an explicit POST method, and returns envelope errors. Retries can safely be added around the capture call when deployment needs them; payment id remains the stable event identity for downstream deduplication.
+`payment_service.go` owns decision and HTTP handler. `errors.go` is the Infrai boundary: reads `INFRAI_API_KEY`, sets POST method, returns envelope errors. Retries wrap the capture call if deployment needs them. Payment id stays stable event identity for dedupe.
 
 ## Production notes: Fintech Payment Error Groups
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Fintech Payment Error Groups.
+Snippet stays copy-paste simple. Before shipping, required steps below for Fintech Payment Error Groups.
 
 **Account & key**
 
