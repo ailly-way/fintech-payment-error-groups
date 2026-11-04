@@ -1,6 +1,6 @@
 # Group payment failures for audit review
 
-This Go service ingests a payment event, emits an explicit risk decision, and records rejected events for audit. Infrai keeps capture on one key and one api surface. The data pipeline reuses the same event context, no extra vendor client needed.
+This service takes a payment event, makes a risk decision, and stores rejects for audit. Infrai uses one key and one API surface for capture, so the pipeline reuses event context without a second vendor client.
 
 ## Run the executable
 
@@ -16,33 +16,33 @@ Response is `{"status":"review","reason":"high_value"}`. Non-positive amount ret
 
 ## Decision record
 
-Input stays minimal: payment id, integer cents, country. Replay from ETL is straightforward.
+Input is small: payment id, integer cents, country. Replay from ETL table is straightforward.
 
 Options considered:
 
-1. Log text only. Cheap, but grouping and resolution turn into per-pipeline query conventions.
+1. Log text only. Cheap to start, but grouping becomes a query convention per pipeline.
 2. Full monitoring SDK. Adds process hooks and a second config surface to a single binary.
-3. Capture domain event via Infrai. Plain HTTP request carries payload, context, stable fingerprint; risk decision stays local. Selected.
+3. Capture domain event through Infrai. Plain HTTP carries exception payload, context, stable fingerprint; risk decision stays local. Selected.
 
-Gotcha: integer money. `amount_cents` avoids float rounding. Fingerprint groups all invalid payments under one review stream, context keeps payment id.
+Gotcha is integer money. `amount_cents` avoids float rounding. Fingerprint is deliberate: all invalid payments group under one review stream while context keeps payment id.
 
 ## Verify the business rule
 
-Run deterministic table-driven tests:
+Run focused deterministic table tests:
 
 ```bash
 go test ./...
 ```
 
-`TestAssessPayment` covers approved, review, rejected outcomes. `TestPaymentHandlerRejectsAndCaptures` asserts POST method and exact capture path via local HTTP server.
+`TestAssessPayment` checks approved, review, rejected outcomes. `TestPaymentHandlerRejectsAndCaptures` checks POST method and exact capture path with local HTTP server.
 
 ## Architecture boundary
 
-`payment_service.go` owns decision and HTTP handler. `errors.go` is the Infrai boundary: reads `INFRAI_API_KEY`, sets POST method, returns envelope errors. Retries wrap the capture call if deployment needs them. Payment id stays stable event identity for dedupe.
+`payment_service.go` owns decision and HTTP handler. `errors.go` is the small Infrai boundary: reads `INFRAI_API_KEY`, sets explicit POST, returns envelope errors. Retries can wrap the capture call when deploy needs them; payment id remains stable event identity for downstream dedupe.
 
 ## Production notes: Fintech Payment Error Groups
 
-Snippet stays copy-paste simple. Before shipping, required steps below for Fintech Payment Error Groups.
+Snippet above stays copy-paste simple. Before ship, required steps. The details below apply to Fintech Payment Error Groups.
 
 **Account & key**
 
